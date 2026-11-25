@@ -1,8 +1,10 @@
 from __future__ import annotations
+import uuid
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from app.db import db, rows_to_list, row_to_dict
-from app.services.common import audit, current_shift, now_str, require_unsealed
+from pydantic import BaseModel
+from app.db import db, db_write, rows_to_list, row_to_dict
+from app.services.common import audit, now_str
+from app.services.gates import GATE_BAG, assert_gate_open, latest_shift
 
 router = APIRouter(tags=["封袋"])
 
@@ -18,6 +20,7 @@ class BagAddIn(BaseModel):
 
 @router.get("/封袋")
 def list_bags():
+    """只读：封班后仍可查。"""
     with db() as conn:
         return rows_to_list(conn.execute(
             """
@@ -31,15 +34,14 @@ def list_bags():
 
 @router.post("/封袋/开袋")
 def open_bag(body: BagOpenIn):
-    with db() as conn:
-        require_unsealed(conn)
-        shift = current_shift(conn)
+    # 封袋闸-开袋：封班后禁止开新袋
+    with db_write() as conn:
+        shift = latest_shift(conn)
+        assert_gate_open(conn, shift["id"], GATE_BAG)
         chute = conn.execute("SELECT * FROM chutes WHERE id=?", (body.口门编号,)).fetchone()
         if not chute:
             raise HTTPException(404, "口门不存在")
-        code = f"袋-{chute['code']}-{shift['id']}-{int(now_str()[-2:])}{shift['id']}"
-        # unique-ish
-        code = f"袋-{chute['code']}-{shift['id']}-{now_str().replace(':','').replace(' ', '')[-10:]}"
+        code = f"袋-{chute['code']}-{shift['id']}-{uuid.uuid4().hex[:10]}"
         conn.execute(
             "INSERT INTO bags(shift_id, chute_id, code, status, note) VALUES (?, ?, ?, '集包中', ?)",
             (shift["id"], body.口门编号, code, body.备注),
@@ -51,11 +53,12 @@ def open_bag(body: BagOpenIn):
 
 @router.post("/封袋/{bag_id}/入袋")
 def add_to_bag(bag_id: int, body: BagAddIn):
-    with db() as conn:
-        require_unsealed(conn)
+    # 封袋闸-入袋：按袋所属班次判闸
+    with db_write() as conn:
         bag = conn.execute("SELECT * FROM bags WHERE id=?", (bag_id,)).fetchone()
         if not bag:
             raise HTTPException(404, "袋不存在")
+        assert_gate_open(conn, bag["shift_id"], GATE_BAG)
         if bag["status"] != "集包中":
             raise HTTPException(400, "袋已封，禁止再入")
         scan = conn.execute("SELECT * FROM scans WHERE id=?", (body.扫描编号,)).fetchone()
@@ -75,11 +78,12 @@ def add_to_bag(bag_id: int, body: BagAddIn):
 
 @router.post("/封袋/{bag_id}/封口")
 def seal_bag(bag_id: int):
-    with db() as conn:
-        require_unsealed(conn)
+    # 封袋闸-封口：未封班不挡、已封班必挡（口径与入袋同一闸，不另立规则）
+    with db_write() as conn:
         bag = conn.execute("SELECT * FROM bags WHERE id=?", (bag_id,)).fetchone()
         if not bag:
             raise HTTPException(404, "袋不存在")
+        assert_gate_open(conn, bag["shift_id"], GATE_BAG)
         if bag["status"] != "集包中":
             raise HTTPException(400, "袋状态不可封口")
         n = conn.execute(

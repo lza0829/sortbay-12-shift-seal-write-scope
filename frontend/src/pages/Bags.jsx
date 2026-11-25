@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
+import GateBanner from '../components/GateBanner'
+import { useGate, isWriteLocked } from '../gate'
 
 export default function Bags() {
   const [bags, setBags] = useState([])
@@ -10,6 +12,8 @@ export default function Bags() {
   const [scanId, setScanId] = useState('')
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
+  const { gate } = useGate()
+  const locked = isWriteLocked(gate)
   const load = async () => {
     setBags(await api('/封袋'))
     const cs = await api('/口门'); setChutes(cs)
@@ -38,26 +42,28 @@ export default function Bags() {
   return (
     <div className="panel">
       <h2>封袋</h2>
+      <GateBanner />
+      {locked && <div className="lock-note">已封班：封袋闸关闭，禁止开新袋、入袋与封口，仅可查询既有袋。</div>}
       {msg && <div className="msg">{msg}</div>}
       {err && <div className="err">{err}</div>}
       <div className="row">
         <label>口门
-          <select value={chuteId} onChange={(e) => setChuteId(e.target.value)}>
+          <select value={chuteId} onChange={(e) => setChuteId(e.target.value)} disabled={locked}>
             {chutes.map((c) => <option key={c.id} value={c.id}>{c.code}</option>)}
           </select>
         </label>
-        <button type="button" onClick={openBag}>开袋</button>
+        <button type="button" onClick={openBag} disabled={locked}>{locked ? '封袋闸已关' : '开袋'}</button>
       </div>
       <div className="row">
-        <label>袋编号<input value={bagId} onChange={(e) => setBagId(e.target.value)} /></label>
+        <label>袋编号<input value={bagId} onChange={(e) => setBagId(e.target.value)} disabled={locked} /></label>
         <label>已路由扫描
-          <select value={scanId} onChange={(e) => setScanId(e.target.value)}>
+          <select value={scanId} onChange={(e) => setScanId(e.target.value)} disabled={locked}>
             <option value="">选择</option>
             {scans.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.barcode}</option>)}
           </select>
         </label>
-        <button type="button" onClick={add}>入袋</button>
-        <button type="button" className="secondary" onClick={seal}>封口</button>
+        <button type="button" onClick={add} disabled={locked || !scanId}>入袋</button>
+        <button type="button" className="secondary" onClick={seal} disabled={locked || !bagId}>封口</button>
       </div>
       <table>
         <thead><tr><th>编号</th><th>袋码</th><th>口门</th><th>状态</th><th>件数</th></tr></thead>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
+import GateBanner from '../components/GateBanner'
 
 export default function Chutes() {
   const [rows, setRows] = useState([])
@@ -13,6 +14,7 @@ export default function Chutes() {
   return (
     <div className="panel">
       <h2>口门</h2>
+      <GateBanner />
       {err && <div className="err">{err}</div>}
       <table>
         <thead><tr><th>口门码</th><th>标题</th><th>状态</th><th>软容量</th><th>操作</th></tr></thead>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
+import GateBanner from '../components/GateBanner'
 
 export default function Overview() {
   const [data, setData] = useState(null)
@@ -9,10 +10,15 @@ export default function Overview() {
   if (err) return <div className="panel err">{err}</div>
   if (!data) return <div className="panel">加载中…</div>
   const d = data.分布 || {}
+  const locked = data.闸态?.全关
   return (
     <div className="panel">
       <h2>总览</h2>
-      <p className="muted">当前班次：{data.班次?.business_day} {data.班次?.name} · {data.班次?.sealed ? '已封班' : '未封班'}</p>
+      <GateBanner />
+      <p className="muted">
+        当前班次：{data.班次?.business_day} {data.班次?.name} ·
+        {locked ? ' 已封班（写口全关，本页只读）' : ' 未封班'}
+      </p>
       <div className="grid">
         {Object.entries(d).map(([k, v]) => (
           <div className="stat" key={k}><div className="n">{v}</div><div className="l">{k}</div></div>

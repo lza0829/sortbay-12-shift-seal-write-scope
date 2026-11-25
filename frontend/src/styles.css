@@ -135,3 +135,35 @@ th { background: #e4e8ee; }
 .msg { margin: 0.5rem 0; color: var(--ok); }
 .err { margin: 0.5rem 0; color: var(--danger); }
 .muted { color: #66707c; font-size: 0.86rem; }
+
+/* 封班闸态灯：全局同刷 */
+.gate-banner {
+  border: 1px solid #8b949e;
+  border-left-width: 6px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+  background: #eef1f4;
+}
+.gate-banner.gate-open { border-left-color: var(--ok); background: #e9f3ec; }
+.gate-banner.gate-locked { border-left-color: var(--danger); background: #f7e7e3; }
+.gate-banner.gate-none { border-left-color: #8b949e; color: #66707c; }
+.gate-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.gate-state { font-weight: 700; }
+.gate-locked .gate-state { color: var(--danger); }
+.gate-open .gate-state { color: var(--ok); }
+.gate-gen { margin-left: auto; font-size: 0.8rem; color: #66707c; }
+.gate-lamps { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.55rem; }
+.lamp {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.82rem; padding: 0.25rem 0.55rem;
+  border: 1px solid #b7bec7; background: #fff;
+}
+.lamp-off { color: var(--danger); }
+.lamp-on { color: var(--ok); }
+.gate-dot, .lamp-dot {
+  width: 0.7rem; height: 0.7rem; border-radius: 50%;
+  display: inline-block;
+}
+.dot-green { background: var(--ok); box-shadow: 0 0 0 2px #2f6f4e33; }
+.dot-red { background: var(--danger); box-shadow: 0 0 0 2px #a33b2b33; }
+.lock-note { color: var(--danger); font-size: 0.85rem; margin: 0.4rem 0; font-weight: 700; }

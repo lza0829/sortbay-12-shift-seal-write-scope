@@ -1,8 +1,10 @@
 from __future__ import annotations
+import uuid
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from app.db import db, rows_to_list, row_to_dict
-from app.services.common import audit, current_shift, now_str, require_unsealed
+from pydantic import BaseModel
+from app.db import db, db_write, rows_to_list, row_to_dict
+from app.services.common import audit, now_str
+from app.services.gates import GATE_DIVERT, assert_gate_open
 
 router = APIRouter(tags=["错分回流"])
 
@@ -14,6 +16,7 @@ class DivertIn(BaseModel):
 
 @router.get("/回流批次")
 def list_batches():
+    """只读：封班后仍可查。"""
     with db() as conn:
         return rows_to_list(conn.execute(
             "SELECT * FROM divert_batches ORDER BY id DESC LIMIT 100"
@@ -22,15 +25,16 @@ def list_batches():
 
 @router.post("/回流批次")
 def create_divert(body: DivertIn):
-    with db() as conn:
-        require_unsealed(conn)
-        shift = current_shift(conn)
+    # 回流闸：按扫描件所属班次判闸
+    with db_write() as conn:
         scan = conn.execute("SELECT * FROM scans WHERE id=?", (body.扫描编号,)).fetchone()
         if not scan:
             raise HTTPException(404, "扫描不存在")
+        assert_gate_open(conn, scan["shift_id"], GATE_DIVERT)
         if scan["status"] not in ("已路由", "已入袋"):
             raise HTTPException(400, "仅已路由或已入袋可标错分回流")
-        code = f"回流-{shift['id']}-{now_str().replace(' ', '').replace(':', '')[-8:]}"
+        shift = conn.execute("SELECT * FROM shifts WHERE id=?", (scan["shift_id"],)).fetchone()
+        code = f"回流-{shift['id']}-{uuid.uuid4().hex[:10]}"
         conn.execute(
             "INSERT INTO divert_batches(shift_id, code, status, created_at, note) VALUES (?, ?, '回流中', ?, ?)",
             (shift["id"], code, now_str(), body.备注),
